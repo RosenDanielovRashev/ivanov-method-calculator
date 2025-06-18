@@ -23,10 +23,10 @@ def compute_Eeq(h, D, E1, E2):
 st.title("📐 Калкулатор: Метод на Иванов (с реални изолинии)")
 
 # Входни полета
-E1 = st.number_input("E1 (MPa)", value=3000)
-E2 = st.number_input("E2 (MPa)", value=200)
+E1 = st.number_input("E1 (MPa)", value=2600)
+E2 = st.number_input("E2 (MPa)", value=3000)
 h = st.number_input("h (cm)", value=20)
-D = st.number_input("D (cm)", value=30)
+D = st.number_input("D (cm)", value=40)
 
 # Автоматично показване на изчислени съотношения
 st.subheader("📊 Въведени параметри:")
