@@ -38,17 +38,31 @@ st.write(pd.DataFrame({
 # Бутон за изчисление
 if st.button("Изчисли"):
     result = compute_Eeq(h, D, E1, E2)
+    hD_point = h / D
+    E1E2_point = E1 / E2
+
     if result is None:
         st.warning("Извън обхвата на таблицата. Добави още изолинии.")
     else:
         st.success(f"Eeq = {result:.2f} MPa")
+        st.info(f"Eeq / E2 = {result / E2:.3f}")
 
+        # Подготовка на графика
         hD_vals = np.linspace(0.01, 0.75, 100)
-        Eeq_vals = [compute_Eeq(hd * D, D, E1, E2) for hd in hD_vals]
+        Eeq_vals = []
+        hD_clean = []
+
+        for hd in hD_vals:
+            val = compute_Eeq(hd * D, D, E1, E2)
+            if val is not None:
+                Eeq_vals.append(val / E2)
+                hD_clean.append(hd)
 
         fig, ax = plt.subplots()
-        ax.plot(hD_vals, np.array(Eeq_vals) / E2, label="Eeq/E2", color='blue')
+        ax.plot(hD_clean, Eeq_vals, label="Eeq/E2", color='blue')
+        ax.scatter([hD_point], [result / E2], color='red', label="Твоята точка", zorder=5)
         ax.set_xlabel("h/D")
         ax.set_ylabel("Eeq/E2")
         ax.set_title("Графика: Eeq/E2 спрямо h/D")
+        ax.legend()
         st.pyplot(fig)
