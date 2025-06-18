@@ -47,22 +47,23 @@ if st.button("Изчисли"):
         st.success(f"Eeq = {result:.2f} MPa")
         st.info(f"Eeq / E2 = {result / E2:.3f}")
 
-        # Подготовка на графика
-        hD_vals = np.linspace(0.01, 0.75, 100)
-        Eeq_vals = []
-        hD_clean = []
+        # Контурна графика (като Фиг. 9.1)
+        x = data["h_over_D"].values
+        y = data["E1_over_E2"].values
+        z = data["Eeq_over_E2"].values
 
-        for hd in hD_vals:
-            val = compute_Eeq(hd * D, D, E1, E2)
-            if val is not None:
-                Eeq_vals.append(val / E2)
-                hD_clean.append(hd)
+        xi = np.linspace(min(x), max(x), 100)
+        yi = np.linspace(min(y), max(y), 100)
+        X, Y = np.meshgrid(xi, yi)
+        Z = griddata((x, y), z, (X, Y), method='linear')
 
-        fig, ax = plt.subplots()
-        ax.plot(hD_clean, Eeq_vals, label="Eeq/E2", color='blue')
-        ax.scatter([hD_point], [result / E2], color='red', label="Твоята точка", zorder=5)
-        ax.set_xlabel("h/D")
-        ax.set_ylabel("Eeq/E2")
-        ax.set_title("Графика: Eeq/E2 спрямо h/D")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        cp = ax.contour(X, Y, Z, levels=np.linspace(min(z), max(z), 10), cmap='viridis')
+        ax.clabel(cp, inline=True, fontsize=8)
+        ax.set_xlabel("h / D")
+        ax.set_ylabel("E1 / E2")
+        ax.set_title("Изолинии на Eeq / E2 (като Фиг. 9.1)")
+        ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
         ax.legend()
+        ax.grid(True)
         st.pyplot(fig)
