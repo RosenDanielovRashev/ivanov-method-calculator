@@ -48,16 +48,14 @@ if st.button("Изчисли"):
         st.info(f"Eeq / E2 = {result / E2:.3f}")
 
         # Графика само с оригиналните изолинии
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.subplots(figsize=(12, 8))
         for value, group in data.groupby("Eeq_over_E2"):
             group_sorted = group.sort_values("h_over_D")
             ax.plot(group_sorted["h_over_D"], group_sorted["E1_over_E2"],
                     label=f"Eeq/E2 = {value:.2f}")
 
         ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
-        ax.set_xticks(np.arange(0, 1.05, 0.1))
         ax.set_xlabel("h / D")
-        ax.set_yticks(np.arange(0, 0.95, 0.05))
         ax.set_ylabel("E1 / E2")
         ax.set_title("Изолинии на Eeq / E2 (от реални данни)")
         ax.legend()
