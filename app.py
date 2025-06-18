@@ -55,7 +55,9 @@ if st.button("Изчисли"):
                     label=f"Eeq/E2 = {value:.2f}")
 
         ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
+        ax.set_xticks(np.arange(0, 1.05, 0.1))
         ax.set_xlabel("h / D")
+        ax.set_yticks(np.arange(0, 5.05, 0.05))
         ax.set_ylabel("E1 / E2")
         ax.set_title("Изолинии на Eeq / E2 (от реални данни)")
         ax.legend()
