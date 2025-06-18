@@ -20,7 +20,7 @@ def compute_Eeq(h, D, E1, E2):
         return None
     return ratio * E2
 
-st.title("📐 Калкулатор: Метод на Иванов")
+st.title("📐 Калкулатор: Метод на Иванов (с реални изолинии)")
 
 # Входни полета
 E1 = st.number_input("E1 (MPa)", value=3000)
@@ -47,23 +47,17 @@ if st.button("Изчисли"):
         st.success(f"Eeq = {result:.2f} MPa")
         st.info(f"Eeq / E2 = {result / E2:.3f}")
 
-        # Контурна графика (като Фиг. 9.1)
-        x = data["h_over_D"].values
-        y = data["E1_over_E2"].values
-        z = data["Eeq_over_E2"].values
-
-        xi = np.linspace(min(x), max(x), 100)
-        yi = np.linspace(min(y), max(y), 100)
-        X, Y = np.meshgrid(xi, yi)
-        Z = griddata((x, y), z, (X, Y), method='linear')
-
+        # Графика само с оригиналните изолинии
         fig, ax = plt.subplots(figsize=(8, 6))
-        cp = ax.contour(X, Y, Z, levels=np.linspace(min(z), max(z), 10), cmap='viridis')
-        ax.clabel(cp, inline=True, fontsize=8)
+        for value, group in data.groupby("Eeq_over_E2"):
+            group_sorted = group.sort_values("h_over_D")
+            ax.plot(group_sorted["h_over_D"], group_sorted["E1_over_E2"],
+                    label=f"Eeq/E2 = {value:.2f}")
+
+        ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
         ax.set_xlabel("h / D")
         ax.set_ylabel("E1 / E2")
-        ax.set_title("Изолинии на Eeq / E2 (като Фиг. 9.1)")
-        ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
+        ax.set_title("Изолинии на Eeq / E2 (от реални данни)")
         ax.legend()
         ax.grid(True)
         st.pyplot(fig)
