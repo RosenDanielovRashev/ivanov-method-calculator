@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 
 @st.cache_data
@@ -14,29 +13,29 @@ def compute_Eeq(h, D, E1, E2):
     hD = h / D
     E1E2 = E1 / E2
 
-    # Групиране по изолинии
     iso_levels = sorted(data['Eeq_over_E2'].unique())
-    for i in range(len(iso_levels) - 1):
-        low = iso_levels[i]
-        high = iso_levels[i + 1]
+    for low, high in zip(iso_levels, iso_levels[1:]):
+        grp_low = data[data['Eeq_over_E2'] == low].sort_values('h_over_D')
+        grp_high = data[data['Eeq_over_E2'] == high].sort_values('h_over_D')
 
-        group_low = data[data["Eeq_over_E2"] == low]
-        group_high = data[data["Eeq_over_E2"] == high]
+        # Проверка дали h/D попада в обхвата на двете изолинии
+        if not (grp_low['h_over_D'].min() <= hD <= grp_low['h_over_D'].max() and
+                grp_high['h_over_D'].min() <= hD <= grp_high['h_over_D'].max()):
+            continue
 
-        # Комбинирани точки и стойности
-        points = pd.concat([group_low, group_high])[['h_over_D', 'E1_over_E2']].values
-        values = np.array([low]*len(group_low) + [high]*len(group_high))
+        # Интерполираме E1/E2 при зададеното h/D
+        y_low = np.interp(hD, grp_low['h_over_D'], grp_low['E1_over_E2'])
+        y_high = np.interp(hD, grp_high['h_over_D'], grp_high['E1_over_E2'])
 
-        # Интерполация само между тези две изолинии
-        result = griddata(points, values, (hD, E1E2), method='linear')
+        # Ако точката е между двете изолинии
+        if y_low <= E1E2 <= y_high:
+            frac = (E1E2 - y_low) / (y_high - y_low)
+            eq_over_e2 = low + frac * (high - low)
+            return eq_over_e2 * E2
 
-        if not np.isnan(result):
-            return result * E2
+    return None  # Извън диапазона на наличните изолинии
 
-    # Извън обхвата
-    return None
-
-st.title("📐 Калкулатор: Метод на Иванов (с реални изолинии)")
+st.title("📐 Калкулатор: Метод на Иванов (само между изолинии)")
 
 # Входни полета
 E1 = st.number_input("E1 (MPa)", value=2600)
@@ -44,7 +43,7 @@ E2 = st.number_input("E2 (MPa)", value=3000)
 h = st.number_input("h (cm)", value=20)
 D = st.number_input("D (cm)", value=40)
 
-# Автоматично показване на изчислени съотношения
+# Показване на изходните съотношения
 st.subheader("📊 Въведени параметри:")
 st.write(pd.DataFrame({
     "Параметър": ["E1", "E2", "h", "D", "E1 / E2", "h / D"],
@@ -63,7 +62,7 @@ if st.button("Изчисли"):
         st.success(f"Eeq = {result:.2f} MPa")
         st.info(f"Eeq / E2 = {result / E2:.3f}")
 
-        # Графика само с оригиналните изолинии
+        # Графика на реалните изолинии
         fig, ax = plt.subplots(figsize=(12, 8))
         for value, group in data.groupby("Eeq_over_E2"):
             group_sorted = group.sort_values("h_over_D")
@@ -73,7 +72,7 @@ if st.button("Изчисли"):
         ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
         ax.set_xlabel("h / D")
         ax.set_ylabel("E1 / E2")
-        ax.set_title("Изолинии на Eeq / E2 (от реални данни)")
+        ax.set_title("Изолинии на Eeq / E2 (реални данни)")
         ax.legend()
         ax.grid(True)
         st.pyplot(fig)
