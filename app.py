@@ -2,17 +2,16 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from scipy.interpolate import griddata
-from scipy.spatial import Delaunay
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
 
-# Кеширано зареждане на данни
+# Кеширано зареждане на CSV
 @st.cache_data
 def load_data():
     return pd.read_csv("combined_data.csv")
 
-# Зареждане на данните
 data = load_data()
+
+# Извличане на координати и стойности
 points = data[['h_over_D', 'E1_over_E2']].values
 values = data['Eeq_over_E2'].values
 
@@ -34,55 +33,57 @@ E2 = st.number_input("E2 (MPa)", value=3000)
 h = st.number_input("h (cm)", value=20)
 D = st.number_input("D (cm)", value=40)
 
-# Показване на параметрите
+# Показване на въведени стойности
 st.subheader("📊 Въведени параметри:")
 st.write(pd.DataFrame({
     "Параметър": ["E1", "E2", "h", "D", "E1 / E2", "h / D"],
     "Стойност": [E1, E2, h, D, round(E1 / E2, 3), round(h / D, 3)]
 }))
 
-# Бутон за изчисление
+# Изчисление
 if st.button("Изчисли"):
     result = compute_Eeq(h, D, E1, E2)
     hD_point = h / D
     E1E2_point = E1 / E2
-    interp_point = np.array([hD_point, E1E2_point])
+    interp_ratio = result / E2 if result else None
 
     if result is None:
         st.warning("Извън обхвата на таблицата. Добави още изолинии.")
-        triangle_vertices = None
     else:
         st.success(f"Eeq = {result:.2f} MPa")
-        st.info(f"Eeq / E2 = {result / E2:.3f}")
+        st.info(f"Eeq / E2 = {interp_ratio:.3f}")
 
-        # --- Намери триъгълника за интерполация ---
-        tri = Delaunay(points)
-        simp_index = tri.find_simplex(interp_point)
+        # ---- Намиране на две съседни изолинии ----
+        iso_levels = sorted(data["Eeq_over_E2"].unique())
+        lower, upper = None, None
 
-        if simp_index == -1:
-            st.warning("Точката е извън триангулацията – не може да се покаже триъгълник.")
-            triangle_vertices = None
+        for i in range(len(iso_levels) - 1):
+            if iso_levels[i] <= interp_ratio <= iso_levels[i + 1]:
+                lower = iso_levels[i]
+                upper = iso_levels[i + 1]
+                break
+
+        if lower is not None and upper is not None:
+            st.info(f"📈 Точката е между изолинии Eeq/E2 = {lower:.2f} и {upper:.2f}")
         else:
-            vert_indices = tri.simplices[simp_index]
-            triangle_vertices = points[vert_indices]
+            st.warning("Точката съвпада с изолиния или е извън обхвата.")
 
-        # --- Визуализация ---
+        # ---- Графика ----
         fig, ax = plt.subplots(figsize=(12, 8))
 
-        # Изолинии от данните
         for value, group in data.groupby("Eeq_over_E2"):
             group_sorted = group.sort_values("h_over_D")
-            ax.plot(group_sorted["h_over_D"], group_sorted["E1_over_E2"],
-                    label=f"Eeq/E2 = {value:.2f}")
 
-        # Червена точка – въведена от потребителя
-        ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
+            if value == lower or value == upper:
+                ax.plot(group_sorted["h_over_D"], group_sorted["E1_over_E2"],
+                        linewidth=3, linestyle='--', color='blue',
+                        label=f"★ Eeq/E2 = {value:.2f}")
+            else:
+                ax.plot(group_sorted["h_over_D"], group_sorted["E1_over_E2"],
+                        linewidth=1, alpha=0.5, label=f"Eeq/E2 = {value:.2f}")
 
-        # Интерполационен триъгълник
-        if triangle_vertices is not None:
-            triangle = Polygon(triangle_vertices, color='orange', alpha=0.3, label="Интерполационен триъгълник")
-            ax.add_patch(triangle)
-            ax.plot(*zip(*triangle_vertices, triangle_vertices[0]), color='orange')
+        # Добавяне на точката
+        ax.scatter([hD_point], [E1E2_point], color='red', s=100, zorder=5, label="Твоята точка")
 
         ax.set_xlabel("h / D")
         ax.set_ylabel("E1 / E2")
