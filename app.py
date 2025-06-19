@@ -23,17 +23,20 @@ def compute_Eeq(h, D, E1, E2):
                 grp_high['h_over_D'].min() <= hD <= grp_high['h_over_D'].max()):
             continue
 
-        # Интерполираме E1/E2 при зададеното h/D
+        # Интерполираме E1/E2 при зададеното hD
         y_low = np.interp(hD, grp_low['h_over_D'], grp_low['E1_over_E2'])
         y_high = np.interp(hD, grp_high['h_over_D'], grp_high['E1_over_E2'])
 
-        # Ако точката е между двете изолинии
-        if y_low <= E1E2 <= y_high:
-            frac = (E1E2 - y_low) / (y_high - y_low)
-            eq_over_e2 = low + frac * (high - low)
-            return eq_over_e2 * E2
+        # ❗ Проверка: дали реалната точка попада между кривите
+        if not (min(y_low, y_high) <= E1E2 <= max(y_low, y_high)):
+            continue
 
-    return None  # Извън диапазона на наличните изолинии
+        # Линейна интерполация по Eeq/E2
+        frac = (E1E2 - y_low) / (y_high - y_low)
+        eq_over_e2 = low + frac * (high - low)
+        return eq_over_e2 * E2
+
+    return None  # Извън обхвата
 
 st.title("📐 Калкулатор: Метод на Иванов (само между изолинии)")
 
@@ -43,7 +46,7 @@ E2 = st.number_input("E2 (MPa)", value=3000)
 h = st.number_input("h (cm)", value=20)
 D = st.number_input("D (cm)", value=40)
 
-# Показване на изходните съотношения
+# Показване на входните стойности
 st.subheader("📊 Въведени параметри:")
 st.write(pd.DataFrame({
     "Параметър": ["E1", "E2", "h", "D", "E1 / E2", "h / D"],
@@ -70,6 +73,8 @@ if st.button("Изчисли"):
                     label=f"Eeq/E2 = {value:.2f}")
 
         ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
+        ax.set_xticks(np.arange(0, 2.05, 0.1))
+        ax.set_yticks(np.arange(0, 0.95, 0.05))
         ax.set_xlabel("h / D")
         ax.set_ylabel("E1 / E2")
         ax.set_title("Изолинии на Eeq / E2 (реални данни)")
