@@ -12,33 +12,38 @@ data = load_data()
 def compute_Eeq(h, D, E1, E2):
     hD = h / D
     E1E2 = E1 / E2
+    tol = 1e-4  # допуск за плаваща точка
 
     iso_levels = sorted(data['Eeq_over_E2'].unique())
     for low, high in zip(iso_levels, iso_levels[1:]):
         grp_low = data[data['Eeq_over_E2'] == low].sort_values('h_over_D')
         grp_high = data[data['Eeq_over_E2'] == high].sort_values('h_over_D')
 
-        # Проверка дали h/D попада в обхвата на двете изолинии
-        if not (grp_low['h_over_D'].min() <= hD <= grp_low['h_over_D'].max() and
-                grp_high['h_over_D'].min() <= hD <= grp_high['h_over_D'].max()):
+        if not (grp_low['h_over_D'].min() - tol <= hD <= grp_low['h_over_D'].max() + tol and
+                grp_high['h_over_D'].min() - tol <= hD <= grp_high['h_over_D'].max() + tol):
             continue
 
-        # Интерполираме E1/E2 при зададеното hD
-        y_low = np.interp(hD, grp_low['h_over_D'], grp_low['E1_over_E2'])
-        y_high = np.interp(hD, grp_high['h_over_D'], grp_high['E1_over_E2'])
+        try:
+            y_low = np.interp(hD, grp_low['h_over_D'], grp_low['E1_over_E2'])
+            y_high = np.interp(hD, grp_high['h_over_D'], grp_high['E1_over_E2'])
+        except:
+            continue
 
-        # ❗ Проверка: дали реалната точка попада между кривите
-        if not (min(y_low, y_high) <= E1E2 <= max(y_low, y_high)):
+        if not (min(y_low, y_high) - tol <= E1E2 <= max(y_low, y_high) + tol):
             continue
 
         # Линейна интерполация по Eeq/E2
-        frac = (E1E2 - y_low) / (y_high - y_low)
+        if np.isclose(y_high, y_low):
+            frac = 0
+        else:
+            frac = (E1E2 - y_low) / (y_high - y_low)
+
         eq_over_e2 = low + frac * (high - low)
         return eq_over_e2 * E2
 
     return None  # Извън обхвата
 
-st.title("📐 Калкулатор: Метод на Иванов (само между изолинии)")
+st.title("📐 Калкулатор: Метод на Иванов (контролирана интерполация)")
 
 # Входни полета
 E1 = st.number_input("E1 (MPa)", value=2600)
@@ -46,7 +51,7 @@ E2 = st.number_input("E2 (MPa)", value=3000)
 h = st.number_input("h (cm)", value=20)
 D = st.number_input("D (cm)", value=40)
 
-# Показване на входните стойности
+# Показване на изходните съотношения
 st.subheader("📊 Въведени параметри:")
 st.write(pd.DataFrame({
     "Параметър": ["E1", "E2", "h", "D", "E1 / E2", "h / D"],
