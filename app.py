@@ -9,16 +9,32 @@ def load_data():
     return pd.read_csv("combined_data.csv")
 
 data = load_data()
-points = data[['h_over_D', 'E1_over_E2']].values
-values = data['Eeq_over_E2'].values
 
 def compute_Eeq(h, D, E1, E2):
     hD = h / D
     E1E2 = E1 / E2
-    ratio = griddata(points, values, (hD, E1E2), method='linear')
-    if np.isnan(ratio):
-        return None
-    return ratio * E2
+
+    # Групиране по изолинии
+    iso_levels = sorted(data['Eeq_over_E2'].unique())
+    for i in range(len(iso_levels) - 1):
+        low = iso_levels[i]
+        high = iso_levels[i + 1]
+
+        group_low = data[data["Eeq_over_E2"] == low]
+        group_high = data[data["Eeq_over_E2"] == high]
+
+        # Комбинирани точки и стойности
+        points = pd.concat([group_low, group_high])[['h_over_D', 'E1_over_E2']].values
+        values = np.array([low]*len(group_low) + [high]*len(group_high))
+
+        # Интерполация само между тези две изолинии
+        result = griddata(points, values, (hD, E1E2), method='linear')
+
+        if not np.isnan(result):
+            return result * E2
+
+    # Извън обхвата
+    return None
 
 st.title("📐 Калкулатор: Метод на Иванов (с реални изолинии)")
 
@@ -42,7 +58,7 @@ if st.button("Изчисли"):
     E1E2_point = E1 / E2
 
     if result is None:
-        st.warning("Извън обхвата на таблицата. Добави още изолинии.")
+        st.warning("Точката е извън обхвата на наличните изолинии.")
     else:
         st.success(f"Eeq = {result:.2f} MPa")
         st.info(f"Eeq / E2 = {result / E2:.3f}")
