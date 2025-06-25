@@ -87,7 +87,7 @@ if Ei == 0 or D == 0:
     st.stop()
 
 if mode == "Ed / Ei":
-    h = st.number_input("h (cm)", value=20.0)
+    h = st.number_input("h (cm)", value=4.0)
     EeEi = Ee / Ei
     st.subheader("📊 Въведени параметри:")
     st.write(pd.DataFrame({
