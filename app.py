@@ -6,7 +6,6 @@ import plotly.graph_objs as go
 @st.cache_data
 def load_data():
     df = pd.read_csv("combined_data.csv")
-    # Ако все още имаш старите имена, замени ги тук
     df = df.rename(columns={
         "E1_over_E2": "Ed_over_Ei",
         "Eeq_over_E2": "Ee_over_Ei"
@@ -15,119 +14,96 @@ def load_data():
 
 data = load_data()
 
-def compute_Eeq(h, D, Ed, Ei):
-    hD = h / D
-    EdEi = Ed / Ei
+def interpolate_EdEi_for_EeEi(Ee, Ei):
+    ee_over_ei = Ee / Ei
     tol = 1e-4
+
+    # Намери две изолинии между които е ee_over_ei
     iso_levels = sorted(data['Ee_over_Ei'].unique())
 
+    low_iso = None
+    high_iso = None
     for low, high in zip(iso_levels, iso_levels[1:]):
-        grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
-        grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
+        if low - tol <= ee_over_ei <= high + tol:
+            low_iso = low
+            high_iso = high
+            break
 
-        h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
-        h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
-        if not (h_min - tol <= hD <= h_max + tol):
-            continue
+    if low_iso is None or high_iso is None:
+        return None  # извън диапазона
 
-        try:
-            y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
-            y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
-        except:
-            continue
+    # Вземи данните за двете изолинии
+    grp_low = data[data['Ee_over_Ei'] == low_iso].sort_values('h_over_D')
+    grp_high = data[data['Ee_over_Ei'] == high_iso].sort_values('h_over_D')
 
-        if not (min(y_low, y_high) - tol <= EdEi <= max(y_low, y_high) + tol):
-            continue
+    # Общ интервал на h/D за двете групи
+    h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
+    h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
 
-        frac = 0 if np.isclose(y_high, y_low) else (EdEi - y_low) / (y_high - y_low)
-        ee_over_ei = low + frac * (high - low)
+    # Филтрирай точките в общия интервал
+    grp_low = grp_low[(grp_low['h_over_D'] >= h_min) & (grp_low['h_over_D'] <= h_max)]
+    grp_high = grp_high[(grp_high['h_over_D'] >= h_min) & (grp_high['h_over_D'] <= h_max)]
 
-        st.write("📌 Интерполация между:", f"{low:.2f} → {high:.2f}")
-        return ee_over_ei * Ei, hD, y_low, y_high
+    h_values = grp_low['h_over_D'].values
 
-    return None, None, None, None
+    ed_values = []
+    for hD in h_values:
+        y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
+        y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
+        frac = 0 if np.isclose(high_iso, low_iso) else (ee_over_ei - low_iso) / (high_iso - low_iso)
+        ed_val = y_low + frac * (y_high - y_low)
+        ed_values.append(ed_val)
 
-st.title("📐 Калкулатор: Метод на Иванов (интерактивна версия)")
+    return h_values, np.array(ed_values), low_iso, high_iso
 
-# Входове
-Ed = st.number_input("Ed (MPa)", value=2600.0)
-Ei = st.number_input("Ei (MPa)", value=3000.0)
-Ee = st.number_input("Ee (MPa)", value=2700.0)  # Добавих вход за Ee по твое желание
-h = st.number_input("h (cm)", value=20.0)
-D = st.number_input("D (cm)", value=40.0)
+st.title("📐 Калкулатор: Изчисляване на Ed / Ei от Ee и Ei")
 
-# Проверка за 0, за да няма деление на 0
-if Ei == 0 or D == 0:
-    st.error("Ei и D не могат да бъдат 0.")
-    st.stop()
-
-# Пресмятаме Ee_over_Ei от Ee и Ei за справка
-Ee_over_Ei = Ee / Ei
-
-st.subheader("📊 Въведени параметри и изчисления:")
-st.write(pd.DataFrame({
-    "Параметър": ["Ed", "Ei", "Ee", "h", "D", "Ed / Ei", "Ee / Ei", "h / D"],
-    "Стойност": [
-        Ed,
-        Ei,
-        Ee,
-        h,
-        D,
-        round(Ed / Ei, 3),
-        round(Ee_over_Ei, 3),
-        round(h / D, 3)
-    ]
-}))
+Ee = st.number_input("Ee (MPa)", value=2700.0, min_value=0.0)
+Ei = st.number_input("Ei (MPa)", value=3000.0, min_value=0.1)
 
 if st.button("Изчисли"):
-    result, hD_point, y_low, y_high = compute_Eeq(h, D, Ed, Ei)
-    EdEi_point = Ed / Ei
-
-    if result is None:
-        st.warning("❗ Точката е извън обхвата на наличните изолинии.")
+    res = interpolate_EdEi_for_EeEi(Ee, Ei)
+    if res is None:
+        st.warning("❗ Стойността Ee/Ei е извън обхвата на изолиниите в данните.")
     else:
-        st.success(f"✅ Изчислено Ee = {result:.2f} MPa (Ee / Ei = {result / Ei:.3f})")
+        h_values, ed_values, low_iso, high_iso = res
+        ee_over_ei = Ee / Ei
 
-        # Графика с всички изолинии и точката
+        st.success(f"✅ Изчислени стойности на Ed / Ei за Ee / Ei между {low_iso:.3f} и {high_iso:.3f}")
+        st.write(pd.DataFrame({
+            "h / D": h_values,
+            "Ed / Ei": np.round(ed_values, 4)
+        }))
+
         fig = go.Figure()
 
-        for value, group in data.groupby("Ee_over_Ei"):
-            group_sorted = group.sort_values("h_over_D")
+        # Показваме двете изолинии, между които се интерполира
+        for iso in [low_iso, high_iso]:
+            group = data[data['Ee_over_Ei'] == iso].sort_values('h_over_D')
             fig.add_trace(go.Scatter(
-                x=group_sorted["h_over_D"],
-                y=group_sorted["Ed_over_Ei"],
+                x=group['h_over_D'],
+                y=group['Ed_over_Ei'],
                 mode='lines',
-                name=f"Ee / Ei = {value:.2f}",
-                line=dict(width=1)
+                name=f"Изолиния Ee/Ei = {iso:.3f}",
+                line=dict(dash='dot')
             ))
 
-        # Точката
+        # Интерполираната крива
         fig.add_trace(go.Scatter(
-            x=[hD_point],
-            y=[EdEi_point],
-            mode='markers',
-            name="Твоята точка",
-            marker=dict(size=8, color='red', symbol='circle')
+            x=h_values,
+            y=ed_values,
+            mode='lines+markers',
+            name=f"Интерполирана Ed/Ei за Ee/Ei = {ee_over_ei:.3f}",
+            line=dict(width=3, color='red'),
+            marker=dict(size=6)
         ))
 
-        # Линия на интерполация
-        if y_low is not None and y_high is not None:
-            fig.add_trace(go.Scatter(
-                x=[hD_point, hD_point],
-                y=[y_low, y_high],
-                mode='lines',
-                line=dict(color='green', width=2, dash='dot'),
-                name="Интерполационна линия"
-            ))
-
         fig.update_layout(
-            title="Интерактивна диаграма на изолинии (Ee / Ei)",
+            title="Ed / Ei срещу h / D",
             xaxis_title="h / D",
             yaxis_title="Ed / Ei",
-            xaxis=dict(dtick=0.1),
-            yaxis=dict(dtick=0.05),
-            legend=dict(orientation="h", y=-0.3),
-            height=700
+            height=600,
+            legend=dict(orientation="h", y=-0.3)
         )
 
         st.plotly_chart(fig, use_container_width=True)
