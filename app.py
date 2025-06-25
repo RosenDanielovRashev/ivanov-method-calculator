@@ -48,7 +48,6 @@ def compute_h(Ed, D, Ee, Ei):
     tol = 1e-4
     iso_levels = sorted(data['Ee_over_Ei'].unique())
 
-    # Търсим между кои две изолинии се намира EeEi
     for low, high in zip(iso_levels, iso_levels[1:]):
         if not (low - tol <= EeEi <= high + tol):
             continue
@@ -56,8 +55,6 @@ def compute_h(Ed, D, Ee, Ei):
         grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
         grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
 
-        # Търсим h_over_D, при който интерполираното Ed/Ei е равно на EdEi
-        # Ще опитаме по търсене между min и max h_over_D с някаква резолюция (примерно 1000 точки)
         h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
         h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
 
@@ -74,10 +71,12 @@ def compute_h(Ed, D, Ee, Ei):
 
     return None, None, None, None
 
-
 st.title("📐 Калкулатор: Метод на Иванов (интерактивна версия)")
 
-mode = st.checkbox("Отчитаме Ed / Ei (ако не е отметнато – изчисляваме h)")
+mode = st.radio(
+    "Изберете параметър за отчитане:",
+    ("Ed / Ei", "h / D")
+)
 
 Ee = st.number_input("Ee (MPa)", value=2700.0)
 Ei = st.number_input("Ei (MPa)", value=3000.0)
@@ -87,8 +86,7 @@ if Ei == 0 or D == 0:
     st.error("Ei и D не могат да бъдат 0.")
     st.stop()
 
-if mode:
-    # Режим изчисление на Ed, въвеждаме h
+if mode == "Ed / Ei":
     h = st.number_input("h (cm)", value=20.0)
     EeEi = Ee / Ei
     st.subheader("📊 Въведени параметри:")
@@ -113,7 +111,6 @@ if mode:
             EdEi_point = result / Ei
             st.success(f"✅ Изчислено: Ed / Ei = {EdEi_point:.3f}  \nEd = Ei * {EdEi_point:.3f} = {result:.2f} MPa")
 
-            # Графика
             fig = go.Figure()
             for value, group in data.groupby("Ee_over_Ei"):
                 group_sorted = group.sort_values("h_over_D")
@@ -151,7 +148,6 @@ if mode:
             st.plotly_chart(fig, use_container_width=True)
 
 else:
-    # Режим изчисление на h, въвеждаме Ed
     Ed = st.number_input("Ed (MPa)", value=520.0)
     EeEi = Ee / Ei
     EdEi = Ed / Ei
@@ -177,7 +173,6 @@ else:
         else:
             st.success(f"✅ Изчислено: h = {h_result:.2f} cm (h / D = {hD_point:.3f})")
 
-            # Графика — за справка пак показваме изолиниите и точката (h/D, Ed/Ei)
             fig = go.Figure()
             for value, group in data.groupby("Ee_over_Ei"):
                 group_sorted = group.sort_values("h_over_D")
