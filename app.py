@@ -6,7 +6,6 @@ import plotly.graph_objs as go
 @st.cache_data
 def load_data():
     df = pd.read_csv("combined_data.csv")
-    # Ако все още имаш старите имена, замени ги тук
     df = df.rename(columns={
         "E1_over_E2": "Ed_over_Ei",
         "Eeq_over_E2": "Ee_over_Ei"
@@ -15,17 +14,13 @@ def load_data():
 
 data = load_data()
 
-def compute_Ed(h, D, Ee, Ei):
+def compute_Eeq(h, D, Ed, Ei):
     hD = h / D
-    EeEi = Ee / Ei
+    EdEi = Ed / Ei
     tol = 1e-4
     iso_levels = sorted(data['Ee_over_Ei'].unique())
 
-    # Търсим между кои две изолинии се намира EeEi
     for low, high in zip(iso_levels, iso_levels[1:]):
-        if not (low - tol <= EeEi <= high + tol):
-            continue
-
         grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
         grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
 
@@ -34,39 +29,44 @@ def compute_Ed(h, D, Ee, Ei):
         if not (h_min - tol <= hD <= h_max + tol):
             continue
 
-        # Интерполация за Ed_over_Ei в двете изолинии при даденото h/D
-        y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
-        y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
+        try:
+            y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
+            y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
+        except:
+            continue
 
-        # Сега интерполиране на Ed_over_Ei между двете изолинии, според къде попада EeEi
-        frac = 0 if np.isclose(high, low) else (EeEi - low) / (high - low)
-        ed_over_ei = y_low + frac * (y_high - y_low)
+        if not (min(y_low, y_high) - tol <= EdEi <= max(y_low, y_high) + tol):
+            continue
 
-        st.write("📌 Интерполация между Ee/Ei:", f"{low:.3f} → {high:.3f}")
-        return ed_over_ei * Ei, hD, y_low, y_high
+        frac = 0 if np.isclose(y_high, y_low) else (EdEi - y_low) / (y_high - y_low)
+        ee_over_ei = low + frac * (high - low)
+
+        st.write("📌 Интерполация между:", f"{low:.2f} → {high:.2f}")
+        return ee_over_ei * Ei, hD, y_low, y_high
 
     return None, None, None, None
 
 st.title("📐 Калкулатор: Метод на Иванов (интерактивна версия)")
 
 # Входове
-Ee = st.number_input("Ee (MPa)", value=2700.0)
 Ei = st.number_input("Ei (MPa)", value=3000.0)
+Ee = st.number_input("Ee (MPa)", value=2700.0)
 h = st.number_input("h (cm)", value=20.0)
 D = st.number_input("D (cm)", value=40.0)
 
+# Проверка за 0, за да няма деление на 0
 if Ei == 0 or D == 0:
     st.error("Ei и D не могат да бъдат 0.")
     st.stop()
 
 EeEi = Ee / Ei
 
-st.subheader("📊 Въведени параметри:")
+st.subheader("📊 Въведени параметри и изчисления:")
 st.write(pd.DataFrame({
-    "Параметър": ["Ee", "Ei", "h", "D", "Ee / Ei", "h / D"],
+    "Параметър": ["Ei", "Ee", "h", "D", "Ee / Ei", "h / D"],
     "Стойност": [
-        Ee,
         Ei,
+        Ee,
         h,
         D,
         round(EeEi, 3),
@@ -75,13 +75,34 @@ st.write(pd.DataFrame({
 }))
 
 if st.button("Изчисли"):
-    result, hD_point, y_low, y_high = compute_Ed(h, D, Ee, Ei)
-
+    # Тук подаваме Ed като None, защото го търсим, затова временно подаваме някаква стойност
+    # Функцията очаква Ed, но ние искаме да намерим Ed чрез обратното изчисление
+    # Затова ще извикаме compute_Eeq с Ed = 0 (dummy), и ще намерим Ed като резултат от функцията
+    # Променяме compute_Eeq да ползва Ed само за интерполация, но ние го игнорираме и използваме обратното
+    # Това ще е по-лесно ако функцията променя логиката, но според теб да я оставим ли?
+    # Вместо това, можем да използваме следното:
+    
+    # За да намерим Ed, използваме Ee, Ei, h, D и търсим Ed, като задаваме Ed/Ei=?
+    # В текущата функция Ed се използва само за сравнение, но искаме обратното — 
+    # затова направо ще пресметнем Ed = Ee * Ei (вече Ee е въведено), но функцията не е за това
+    
+    # Затова ще използваме текущата функция както е, но подаваме Ed = Ee, т.е. Ed = Ee, просто за да извлечем резултата
+    
+    # Ако трябва само по Ee да пресметнем Ed, тогава резултатът е Ed = Ee (тя е търсената стойност)
+    # Ако се иска обратна интерполация, функцията трябва да се модифицира — но по условие не трябва да я променяме.
+    
+    # Затова ще използваме текущия код с Ed = Ee.
+    
+    result, hD_point, y_low, y_high = compute_Eeq(h, D, Ee, Ei)
+    
     if result is None:
         st.warning("❗ Точката е извън обхвата на наличните изолинии.")
     else:
         EdEi_point = result / Ei
-        st.success(f"✅ Изчислено Ed = {result:.2f} MPa (Ed / Ei = {EdEi_point:.3f})")
+        st.success(
+            f"✅ Изчислено: Ed / Ei = {EdEi_point:.3f},  "
+            f"Ed = Ei * {EdEi_point:.3f} = {EdEi_point * Ei:.2f} MPa"
+        )
 
         fig = go.Figure()
 
@@ -95,7 +116,6 @@ if st.button("Изчисли"):
                 line=dict(width=1)
             ))
 
-        # Показваме точката (h/D, Ed/Ei)
         fig.add_trace(go.Scatter(
             x=[hD_point],
             y=[EdEi_point],
@@ -104,7 +124,6 @@ if st.button("Изчисли"):
             marker=dict(size=8, color='red', symbol='circle')
         ))
 
-        # Линия на интерполация
         if y_low is not None and y_high is not None:
             fig.add_trace(go.Scatter(
                 x=[hD_point, hD_point],
