@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objs as go
 
 @st.cache_data
 def load_data():
@@ -12,7 +12,7 @@ data = load_data()
 def compute_Eeq(h, D, E1, E2):
     hD = h / D
     E1E2 = E1 / E2
-    tol = 1e-4  # толеранс
+    tol = 1e-4
     iso_levels = sorted(data['Eeq_over_E2'].unique())
     debug_info = []
 
@@ -20,13 +20,11 @@ def compute_Eeq(h, D, E1, E2):
         grp_low = data[data['Eeq_over_E2'] == low].sort_values('h_over_D')
         grp_high = data[data['Eeq_over_E2'] == high].sort_values('h_over_D')
 
-        # проверка дали h/D попада и в двете
         h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
         h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
         if not (h_min - tol <= hD <= h_max + tol):
             continue
 
-        # интерполираме E1/E2 при дадено h/D
         try:
             y_low = np.interp(hD, grp_low['h_over_D'], grp_low['E1_over_E2'])
             y_high = np.interp(hD, grp_high['h_over_D'], grp_high['E1_over_E2'])
@@ -51,12 +49,11 @@ def compute_Eeq(h, D, E1, E2):
         st.write(f"🔹 frac = {frac:.4f}, Eeq/E2 = {eq_over_e2:.4f}")
         return eq_over_e2 * E2
 
-    # Ако не се намери нищо — показваме от какво избира
     st.info("🔎 Диагностика на интерполация (няма съвпадение):")
     st.write(pd.DataFrame(debug_info))
     return None
 
-st.title("📐 Калкулатор: Метод на Иванов (диагностична версия)")
+st.title("📐 Калкулатор: Метод на Иванов (интерактивна версия)")
 
 # Вход
 E1 = st.number_input("E1 (MPa)", value=2600)
@@ -83,19 +80,36 @@ if st.button("Изчисли"):
         st.success(f"✅ Eeq = {result:.2f} MPa")
         st.info(f"Eeq / E2 = {result / E2:.3f}")
 
-        # Графика
-        fig, ax = plt.subplots(figsize=(12, 8))
+        # Интерактивна графика с Plotly
+        fig = go.Figure()
+
         for value, group in data.groupby("Eeq_over_E2"):
             group_sorted = group.sort_values("h_over_D")
-            ax.plot(group_sorted["h_over_D"], group_sorted["E1_over_E2"],
-                    label=f"Eeq/E2 = {value:.2f}")
+            fig.add_trace(go.Scatter(
+                x=group_sorted["h_over_D"],
+                y=group_sorted["E1_over_E2"],
+                mode='lines',
+                name=f"Eeq/E2 = {value:.2f}",
+                line=dict(width=1)
+            ))
 
-        ax.scatter([hD_point], [E1E2_point], color='red', label="Твоята точка", zorder=5)
-        ax.set_xticks(np.arange(0, 2.05, 0.1))
-        ax.set_yticks(np.arange(0, 0.95, 0.05))
-        ax.set_xlabel("h / D")
-        ax.set_ylabel("E1 / E2")
-        ax.set_title("Изолинии на Eeq / E2 (реални данни)")
-        ax.legend()
-        ax.grid(True)
-        st.pyplot(fig)
+        # Добавяне на точката
+        fig.add_trace(go.Scatter(
+            x=[hD_point],
+            y=[E1E2_point],
+            mode='markers',
+            name="Твоята точка",
+            marker=dict(size=8, color='red', symbol='circle')
+        ))
+
+        fig.update_layout(
+            title="Интерактивна диаграма на изолинии (Eeq / E2)",
+            xaxis_title="h / D",
+            yaxis_title="E1 / E2",
+            xaxis=dict(dtick=0.1),
+            yaxis=dict(dtick=0.05),
+            legend=dict(orientation="h", y=-0.3),
+            height=700
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
