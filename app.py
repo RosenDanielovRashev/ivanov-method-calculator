@@ -38,9 +38,9 @@ def compute_Ed(h, D, Ee, Ei):
         frac = 0 if np.isclose(high, low) else (EeEi - low) / (high - low)
         ed_over_ei = y_low + frac * (y_high - y_low)
 
-        return ed_over_ei * Ei, hD, y_low, y_high
+        return ed_over_ei * Ei, hD, y_low, y_high, low, high
 
-    return None, None, None, None
+    return None, None, None, None, None, None
 
 def compute_h(Ed, D, Ee, Ei):
     EeEi = Ee / Ei
@@ -67,9 +67,9 @@ def compute_h(Ed, D, Ee, Ei):
             ed_over_ei = y_low + frac * (y_high - y_low)
 
             if abs(ed_over_ei - EdEi) < tol:
-                return hD * D, hD, y_low, y_high
+                return hD * D, hD, y_low, y_high, low, high
 
-    return None, None, None, None
+    return None, None, None, None, None, None
 
 st.title("📐 Калкулатор: Метод на Иванов (интерактивна версия)")
 
@@ -112,13 +112,14 @@ if mode == "Ed / Ei":
     """)
 
     if st.button("Изчисли Ed"):
-        result, hD_point, y_low, y_high = compute_Ed(h, D, Ee, Ei)
+        result, hD_point, y_low, y_high, low_iso, high_iso = compute_Ed(h, D, Ee, Ei)
 
         if result is None:
             st.warning("❗ Точката е извън обхвата на наличните изолинии.")
         else:
             EdEi_point = result / Ei
             st.success(f"✅ Изчислено: Ed / Ei = {EdEi_point:.3f}  \nEd = Ei * {EdEi_point:.3f} = {result:.2f} MPa")
+            st.info(f"ℹ️ Интерполация между изолини: Ee / Ei = {low_iso:.3f} и Ee / Ei = {high_iso:.3f}")
 
             fig = go.Figure()
             for value, group in data.groupby("Ee_over_Ei"):
@@ -184,12 +185,13 @@ else:
     """)
 
     if st.button("Изчисли h"):
-        h_result, hD_point, y_low, y_high = compute_h(Ed, D, Ee, Ei)
+        h_result, hD_point, y_low, y_high, low_iso, high_iso = compute_h(Ed, D, Ee, Ei)
 
         if h_result is None:
             st.warning("❗ Неуспешно намиране на h — точката е извън обхвата.")
         else:
             st.success(f"✅ Изчислено: h = {h_result:.2f} cm (h / D = {hD_point:.3f})")
+            st.info(f"ℹ️ Интерполация между изолини: Ee / Ei = {low_iso:.3f} и Ee / Ei = {high_iso:.3f}")
 
             fig = go.Figure()
             for value, group in data.groupby("Ee_over_Ei"):
