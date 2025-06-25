@@ -102,7 +102,6 @@ if mode == "Ed / Ei":
         ]
     }))
 
-    # ➕ Легенда
     st.markdown("### 🧾 Легенда:")
     st.markdown("""
     - **Ed** – Модул на еластичност на повърхността под пласта  
@@ -175,7 +174,6 @@ else:
         ]
     }))
 
-    # ➕ Легенда
     st.markdown("### 🧾 Легенда:")
     st.markdown("""
     - **Ed** – Модул на еластичност на повърхността под пласта  
@@ -195,4 +193,7 @@ else:
 
             fig = go.Figure()
             for value, group in data.groupby("Ee_over_Ei"):
-                group_sorted
+                group_sorted = group.sort_values("h_over_D")
+                fig.add_trace(go.Scatter(
+                    x=group_sorted["h_over_D"],
+                   
