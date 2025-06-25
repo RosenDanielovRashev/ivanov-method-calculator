@@ -80,7 +80,7 @@ mode = st.radio(
 
 Ee = st.number_input("Ee (MPa)", value=2700.0)
 Ei = st.number_input("Ei (MPa)", value=3000.0)
-D = st.number_input("D (cm)", value=40.0)
+D = st.selectbox("D (cm)", options=[34.0, 32.04], index=1)  # падащо меню с две стойности
 
 if Ei == 0 or D == 0:
     st.error("Ei и D не могат да бъдат 0.")
