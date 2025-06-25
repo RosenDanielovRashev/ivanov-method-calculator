@@ -3,118 +3,87 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 
-# Зареждане на данни с кеширане
 @st.cache_data
 def load_data():
-    return pd.read_csv("combined_data.csv")
+    df = pd.read_csv("combined_data.csv")
+    # Ако колоните са със стари имена, преименувай ги тук
+    df = df.rename(columns={
+        "E1_over_E2": "Ed_over_Ei",
+        "Eeq_over_E2": "Ee_over_Ei"
+    })
+    return df
 
 data = load_data()
 
-# Основна функция за изчисление на Ee
-def compute_Ee(h, D, Ed, Ei):
+def compute_EdEi(h, D, ee_over_ei):
     hD = h / D
-    EdEi = Ed / Ei
     tol = 1e-4
-    iso_levels = sorted(data['Ee_over_Ei'].unique())
 
-    for low, high in zip(iso_levels, iso_levels[1:]):
-        grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
-        grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
+    # Филтрираме данните по избраната изолиния
+    group = data[data['Ee_over_Ei'] == ee_over_ei].sort_values('h_over_D')
 
-        h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
-        h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
-        if not (h_min - tol <= hD <= h_max + tol):
-            continue
+    if group.empty:
+        return None, None
 
-        try:
-            y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
-            y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
-        except:
-            continue
+    h_min = group['h_over_D'].min()
+    h_max = group['h_over_D'].max()
 
-        if not (min(y_low, y_high) - tol <= EdEi <= max(y_low, y_high) + tol):
-            continue
+    if not (h_min - tol <= hD <= h_max + tol):
+        return None, None  # h/D извън обхвата
 
-        frac = 0 if np.isclose(y_high, y_low) else (EdEi - y_low) / (y_high - y_low)
-        ee_over_ei = low + frac * (high - low)
+    try:
+        ed_over_ei = np.interp(hD, group['h_over_D'], group['Ed_over_Ei'])
+        return ed_over_ei, hD
+    except Exception as e:
+        return None, None
 
-        st.write("📌 Интерполация между:", f"{low:.2f} → {high:.2f}")
-        return ee_over_ei * Ei, hD, y_low, y_high
+st.title("📐 Калкулатор: Метод на Иванов (обратна задача)")
 
-    return None, None, None, None
+# Вход - потребител избира изолиния Ee/Ei и задава h и D
+ee_over_ei_list = sorted(data['Ee_over_Ei'].unique())
+Ee_over_Ei = st.selectbox("Избери Ee / Ei (изолиния)", ee_over_ei_list)
 
-# Заглавие
-st.title("📐 Калкулатор: Метод на Иванов (интерактивна версия)")
+h = st.number_input("h (cm)", value=20.0, min_value=0.0)
+D = st.number_input("D (cm)", value=40.0, min_value=0.1)  # D не може да е 0
 
-# Входни параметри
-Ed = st.number_input("Ed (MPa)", value=2600)
-Ei = st.number_input("Ei (MPa)", value=3000)
-h = st.number_input("h (cm)", value=20)
-D = st.number_input("D (cm)", value=40)
-
-# Проверка за деление на нула
-if Ei == 0 or D == 0:
-    st.error("❌ Ei и D не трябва да са нула.")
-    st.stop()
-
-# Показване на параметрите
-st.subheader("📊 Въведени параметри:")
-st.write(pd.DataFrame({
-    "Параметър": ["Ed", "Ei", "h", "D", "Ed / Ei", "h / D"],
-    "Стойност": [Ed, Ei, h, D, round(Ed / Ei, 3), round(h / D, 3)]
-}))
-
-# Изчисление при натискане на бутон
 if st.button("Изчисли"):
-    result, hD_point, y_low, y_high = compute_Ee(h, D, Ed, Ei)
-    EdEi_point = Ed / Ei
+    Ed_over_Ei, hD = compute_EdEi(h, D, Ee_over_Ei)
 
-    if result is None:
-        st.warning("❗ Точката е извън обхвата на наличните изолинии.")
+    if Ed_over_Ei is None:
+        st.warning("❗ h / D е извън обхвата за избраната изолиния.")
     else:
-        st.success(f"✅ Ee = {result:.2f} MPa")
-        st.info(f"Ee / Ei = {result / Ei:.3f}")
+        st.success(f"✅ Ed / Ei = {Ed_over_Ei:.3f}")
+        st.info(f"h / D = {hD:.3f}")
 
-        # Диаграма
+        # Визуализация на изолинията и точката
+        group = data[data['Ee_over_Ei'] == Ee_over_Ei].sort_values('h_over_D')
+
         fig = go.Figure()
 
-        for value, group in data.groupby("Ee_over_Ei"):
-            group_sorted = group.sort_values("h_over_D")
-            fig.add_trace(go.Scatter(
-                x=group_sorted["h_over_D"],
-                y=group_sorted["Ed_over_Ei"],
-                mode='lines',
-                name=f"Ee/Ei = {value:.2f}",
-                line=dict(width=1)
-            ))
-
-        # Твоята точка
         fig.add_trace(go.Scatter(
-            x=[hD_point],
-            y=[EdEi_point],
-            mode='markers',
-            name="Твоята точка",
-            marker=dict(size=8, color='red', symbol='circle')
+            x=group['h_over_D'],
+            y=group['Ed_over_Ei'],
+            mode='lines',
+            name=f"Ee/Ei = {Ee_over_Ei:.3f}",
+            line=dict(width=2)
         ))
 
-        # Линия на интерполация
-        if y_low is not None and y_high is not None:
-            fig.add_trace(go.Scatter(
-                x=[hD_point, hD_point],
-                y=[y_low, y_high],
-                mode='lines',
-                line=dict(color='green', width=2, dash='dot'),
-                name="Интерполационна линия"
-            ))
+        fig.add_trace(go.Scatter(
+            x=[hD],
+            y=[Ed_over_Ei],
+            mode='markers',
+            name="Твоята точка",
+            marker=dict(size=10, color='red', symbol='circle')
+        ))
 
         fig.update_layout(
-            title="Интерактивна диаграма на изолинии (Ee / Ei)",
+            title="Ed / Ei при зададени Ee / Ei и h / D",
             xaxis_title="h / D",
             yaxis_title="Ed / Ei",
-            xaxis=dict(dtick=0.1),
+            xaxis=dict(dtick=0.05),
             yaxis=dict(dtick=0.05),
             legend=dict(orientation="h", y=-0.3),
-            height=700
+            height=600
         )
 
         st.plotly_chart(fig, use_container_width=True)
