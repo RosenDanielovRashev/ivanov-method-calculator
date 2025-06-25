@@ -196,4 +196,33 @@ else:
                 group_sorted = group.sort_values("h_over_D")
                 fig.add_trace(go.Scatter(
                     x=group_sorted["h_over_D"],
-                   
+                    y=group_sorted["Ed_over_Ei"],
+                    mode='lines',
+                    name=f"Ee / Ei = {value:.2f}",
+                    line=dict(width=1)
+                ))
+            fig.add_trace(go.Scatter(
+                x=[hD_point],
+                y=[EdEi],
+                mode='markers',
+                name="Твоята точка",
+                marker=dict(size=8, color='red', symbol='circle')
+            ))
+            if y_low is not None and y_high is not None:
+                fig.add_trace(go.Scatter(
+                    x=[hD_point, hD_point],
+                    y=[y_low, y_high],
+                    mode='lines',
+                    line=dict(color='green', width=2, dash='dot'),
+                    name="Интерполационна линия"
+                ))
+            fig.update_layout(
+                title="Интерактивна диаграма на изолинии (Ee / Ei)",
+                xaxis_title="h / D",
+                yaxis_title="Ed / Ei",
+                xaxis=dict(dtick=0.1),
+                yaxis=dict(dtick=0.05),
+                legend=dict(orientation="h", y=-0.3),
+                height=700
+            )
+            st.plotly_chart(fig, use_container_width=True)
