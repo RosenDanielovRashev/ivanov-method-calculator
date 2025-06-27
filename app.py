@@ -20,57 +20,61 @@ def round3(x):
 def compute_Ed(h, D, Ee, Ei):
     hD = round3(h / D)
     EeEi = round3(Ee / Ei)
-    tol = 1e-3
     iso_levels = sorted(data['Ee_over_Ei'].unique())
+    tol = 1e-3
 
-    for low, high in zip(iso_levels, iso_levels[1:]):
-        if not (low - tol <= EeEi <= high + tol):
-            continue
+    # Намираме най-близките две изолинии около EeEi
+    low = max([lvl for lvl in iso_levels if lvl <= EeEi], default=None)
+    high = min([lvl for lvl in iso_levels if lvl >= EeEi], default=None)
 
-        grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
-        grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
+    if low is None or high is None:
+        return None, None, None, None, None, None
 
-        h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
-        h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
-        if not (h_min - tol <= hD <= h_max + tol):
-            continue
+    grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
+    grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
 
-        y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
-        y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
+    h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
+    h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
 
-        frac = 0 if np.isclose(high, low) else round3((EeEi - low) / (high - low))
-        ed_over_ei = round3(y_low + frac * (y_high - y_low))
+    if not (h_min - tol <= hD <= h_max + tol):
+        return None, None, None, None, None, None
 
-        return round3(ed_over_ei * Ei), hD, y_low, y_high, low, high
+    y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
+    y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
 
-    return None, None, None, None, None, None
+    frac = 0 if np.isclose(high, low) else (EeEi - low) / (high - low)
+    ed_over_ei = y_low + frac * (y_high - y_low)
+
+    return round3(ed_over_ei * Ei), hD, round3(y_low), round3(y_high), round3(low), round3(high)
 
 def compute_h(Ed, D, Ee, Ei):
-    EeEi = round3(Ee / Ei)
     EdEi = round3(Ed / Ei)
-    tol = 1e-3
+    EeEi = round3(Ee / Ei)
     iso_levels = sorted(data['Ee_over_Ei'].unique())
+    tol = 1e-3
 
-    for low, high in zip(iso_levels, iso_levels[1:]):
-        if not (low - tol <= EeEi <= high + tol):
-            continue
+    low = max([lvl for lvl in iso_levels if lvl <= EeEi], default=None)
+    high = min([lvl for lvl in iso_levels if lvl >= EeEi], default=None)
 
-        grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
-        grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
+    if low is None or high is None:
+        return None, None, None, None, None, None
 
-        h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
-        h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
+    grp_low = data[data['Ee_over_Ei'] == low].sort_values('h_over_D')
+    grp_high = data[data['Ee_over_Ei'] == high].sort_values('h_over_D')
 
-        hD_values = np.linspace(h_min, h_max, 1000)
+    h_min = max(grp_low['h_over_D'].min(), grp_high['h_over_D'].min())
+    h_max = min(grp_low['h_over_D'].max(), grp_high['h_over_D'].max())
 
-        for hD in hD_values:
-            y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
-            y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
-            frac = 0 if np.isclose(high, low) else round3((EeEi - low) / (high - low))
-            ed_over_ei = round3(y_low + frac * (y_high - y_low))
+    hD_values = np.linspace(h_min, h_max, 1000)
 
-            if abs(ed_over_ei - EdEi) < tol:
-                return round3(hD * D), round3(hD), y_low, y_high, low, high
+    for hD in hD_values:
+        y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
+        y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
+        frac = 0 if np.isclose(high, low) else (EeEi - low) / (high - low)
+        ed_over_ei = y_low + frac * (y_high - y_low)
+
+        if abs(ed_over_ei - EdEi) < tol:
+            return round3(hD * D), round3(hD), round3(y_low), round3(y_high), round3(low), round3(high)
 
     return None, None, None, None, None, None
 
@@ -133,7 +137,7 @@ if mode == "Ed / Ei":
                     x=group_sorted["h_over_D"],
                     y=group_sorted["Ed_over_Ei"],
                     mode='lines',
-                    name=f"Ee / Ei = {value:.2f}",
+                    name=f"Ee / Ei = {value:.3f}",
                     line=dict(width=1)
                 ))
             fig.add_trace(go.Scatter(
@@ -143,14 +147,6 @@ if mode == "Ed / Ei":
                 name="Твоята точка",
                 marker=dict(size=8, color='red', symbol='circle')
             ))
-            if y_low is not None and y_high is not None:
-                fig.add_trace(go.Scatter(
-                    x=[hD_point, hD_point],
-                    y=[y_low, y_high],
-                    mode='lines',
-                    line=dict(color='green', width=2, dash='dot'),
-                    name="Интерполационна линия"
-                ))
             fig.update_layout(
                 title="Интерактивна диаграма на изолинии (Ee / Ei)",
                 xaxis_title="h / D",
@@ -205,7 +201,7 @@ else:
                     x=group_sorted["h_over_D"],
                     y=group_sorted["Ed_over_Ei"],
                     mode='lines',
-                    name=f"Ee / Ei = {value:.2f}",
+                    name=f"Ee / Ei = {value:.3f}",
                     line=dict(width=1)
                 ))
             fig.add_trace(go.Scatter(
@@ -215,14 +211,6 @@ else:
                 name="Твоята точка",
                 marker=dict(size=8, color='red', symbol='circle')
             ))
-            if y_low is not None and y_high is not None:
-                fig.add_trace(go.Scatter(
-                    x=[hD_point, hD_point],
-                    y=[y_low, y_high],
-                    mode='lines',
-                    line=dict(color='green', width=2, dash='dot'),
-                    name="Интерполационна линия"
-                ))
             fig.update_layout(
                 title="Интерактивна диаграма на изолинии (Ee / Ei)",
                 xaxis_title="h / D",
