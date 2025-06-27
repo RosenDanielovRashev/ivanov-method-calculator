@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
@@ -14,9 +14,12 @@ def load_data():
 
 data = load_data()
 
+def round3(x):
+    return round(x, 3)
+
 def compute_Ed(h, D, Ee, Ei):
-    hD = h / D
-    EeEi = Ee / Ei
+    hD = round3(h / D)
+    EeEi = round3(Ee / Ei)
     tol = 1e-3
     iso_levels = sorted(data['Ee_over_Ei'].unique())
 
@@ -35,16 +38,16 @@ def compute_Ed(h, D, Ee, Ei):
         y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
         y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
 
-        frac = 0 if np.isclose(high, low) else (EeEi - low) / (high - low)
-        ed_over_ei = y_low + frac * (y_high - y_low)
+        frac = 0 if np.isclose(high, low) else round3((EeEi - low) / (high - low))
+        ed_over_ei = round3(y_low + frac * (y_high - y_low))
 
-        return ed_over_ei * Ei, hD, y_low, y_high, low, high
+        return round3(ed_over_ei * Ei), hD, y_low, y_high, low, high
 
     return None, None, None, None, None, None
 
 def compute_h(Ed, D, Ee, Ei):
-    EeEi = Ee / Ei
-    EdEi = Ed / Ei
+    EeEi = round3(Ee / Ei)
+    EdEi = round3(Ed / Ei)
     tol = 1e-3
     iso_levels = sorted(data['Ee_over_Ei'].unique())
 
@@ -63,11 +66,11 @@ def compute_h(Ed, D, Ee, Ei):
         for hD in hD_values:
             y_low = np.interp(hD, grp_low['h_over_D'], grp_low['Ed_over_Ei'])
             y_high = np.interp(hD, grp_high['h_over_D'], grp_high['Ed_over_Ei'])
-            frac = 0 if np.isclose(high, low) else (EeEi - low) / (high - low)
-            ed_over_ei = y_low + frac * (y_high - y_low)
+            frac = 0 if np.isclose(high, low) else round3((EeEi - low) / (high - low))
+            ed_over_ei = round3(y_low + frac * (y_high - y_low))
 
             if abs(ed_over_ei - EdEi) < tol:
-                return hD * D, hD, y_low, y_high, low, high
+                return round3(hD * D), round3(hD), y_low, y_high, low, high
 
     return None, None, None, None, None, None
 
@@ -80,7 +83,7 @@ mode = st.radio(
 
 Ee = st.number_input("Ee (MPa)", value=2700.0)
 Ei = st.number_input("Ei (MPa)", value=3000.0)
-D = st.selectbox("D (cm)", options=[34.0, 32.04], index=1)  # падащо меню с две стойности
+D = st.selectbox("D (cm)", options=[34.0, 32.04], index=1)
 
 if Ei == 0 or D == 0:
     st.error("Ei и D не могат да бъдат 0.")
@@ -88,7 +91,9 @@ if Ei == 0 or D == 0:
 
 if mode == "Ed / Ei":
     h = st.number_input("h (cm)", value=4.0)
-    EeEi = Ee / Ei
+    EeEi = round3(Ee / Ei)
+    hD = round3(h / D)
+
     st.subheader("📊 Въведени параметри:")
     st.write(pd.DataFrame({
         "Параметър": ["Ee", "Ei", "h", "D", "Ee / Ei", "h / D"],
@@ -97,8 +102,8 @@ if mode == "Ed / Ei":
             Ei,
             h,
             D,
-            round(EeEi, 3),
-            round(h / D, 3)
+            EeEi,
+            hD
         ]
     }))
 
@@ -117,7 +122,7 @@ if mode == "Ed / Ei":
         if result is None:
             st.warning("❗ Точката е извън обхвата на наличните изолинии.")
         else:
-            EdEi_point = result / Ei
+            EdEi_point = round3(result / Ei)
             st.success(f"✅ Изчислено: Ed / Ei = {EdEi_point:.3f}  \nEd = Ei * {EdEi_point:.3f} = {result:.2f} MPa")
             st.info(f"ℹ️ Интерполация между изолини: Ee / Ei = {low_iso:.3f} и Ee / Ei = {high_iso:.3f}")
 
@@ -159,8 +164,8 @@ if mode == "Ed / Ei":
 
 else:
     Ed = st.number_input("Ed (MPa)", value=520.0)
-    EeEi = Ee / Ei
-    EdEi = Ed / Ei
+    EeEi = round3(Ee / Ei)
+    EdEi = round3(Ed / Ei)
 
     st.subheader("📊 Въведени параметри:")
     st.write(pd.DataFrame({
@@ -170,8 +175,8 @@ else:
             Ee,
             Ei,
             D,
-            round(EeEi, 3),
-            round(EdEi, 3),
+            EeEi,
+            EdEi,
         ]
     }))
 
