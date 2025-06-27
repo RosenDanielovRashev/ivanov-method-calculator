@@ -140,6 +140,16 @@ if mode == "Ed / Ei":
                     name=f"Ee / Ei = {value:.3f}",
                     line=dict(width=1)
                 ))
+                
+                # Добавяме линията на интерполация
+             fig.add_trace(go.Scatter(
+             x=[hD_point, hD_point],
+             y=[y_low, y_high],
+             mode='lines',
+             name="Интерполационна линия",
+             line=dict(color='red', width=2, dash='dot')
+            ))
+
             fig.add_trace(go.Scatter(
                 x=[hD_point],
                 y=[EdEi_point],
@@ -204,6 +214,14 @@ else:
                     name=f"Ee / Ei = {value:.3f}",
                     line=dict(width=1)
                 ))
+                # Добавяме линията на интерполация
+             fig.add_trace(go.Scatter(
+             x=[hD_point, hD_point],
+             y=[y_low, y_high],
+             mode='lines',
+             name="Интерполационна линия",
+             line=dict(color='red', width=2, dash='dot')
+            ))
             fig.add_trace(go.Scatter(
                 x=[hD_point],
                 y=[EdEi],
