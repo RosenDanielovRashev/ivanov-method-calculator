@@ -23,6 +23,7 @@ def compute_Ed(h, D, Ee, Ei):
     iso_levels = sorted(data['Ee_over_Ei'].unique())
     tol = 1e-3
 
+    # Намираме най-близките две изолинии около EeEi
     low = max([lvl for lvl in iso_levels if lvl <= EeEi], default=None)
     high = min([lvl for lvl in iso_levels if lvl >= EeEi], default=None)
 
@@ -140,10 +141,13 @@ if mode == "Ed / Ei":
                     line=dict(width=1)
                 ))
 
-            # Добавяме линията на интерполация
+            # Тук гарантираме, че линията опира точно в точките на двете изолинии
+            y_low_correct = np.interp(hD_point, data[data['Ee_over_Ei'] == low_iso]['h_over_D'], data[data['Ee_over_Ei'] == low_iso]['Ed_over_Ei'])
+            y_high_correct = np.interp(hD_point, data[data['Ee_over_Ei'] == high_iso]['h_over_D'], data[data['Ee_over_Ei'] == high_iso]['Ed_over_Ei'])
+
             fig.add_trace(go.Scatter(
                 x=[hD_point, hD_point],
-                y=[y_low, y_high],
+                y=[y_low_correct, y_high_correct],
                 mode='lines',
                 name="Интерполационна линия",
                 line=dict(color='red', width=2, dash='dot')
@@ -156,7 +160,6 @@ if mode == "Ed / Ei":
                 name="Твоята точка",
                 marker=dict(size=8, color='red', symbol='circle')
             ))
-
             fig.update_layout(
                 title="Интерактивна диаграма на изолинии (Ee / Ei)",
                 xaxis_title="h / D",
@@ -215,10 +218,12 @@ else:
                     line=dict(width=1)
                 ))
 
-            # Добавяме линията на интерполация
+            y_low_correct = np.interp(hD_point, data[data['Ee_over_Ei'] == low_iso]['h_over_D'], data[data['Ee_over_Ei'] == low_iso]['Ed_over_Ei'])
+            y_high_correct = np.interp(hD_point, data[data['Ee_over_Ei'] == high_iso]['h_over_D'], data[data['Ee_over_Ei'] == high_iso]['Ed_over_Ei'])
+
             fig.add_trace(go.Scatter(
                 x=[hD_point, hD_point],
-                y=[y_low, y_high],
+                y=[y_low_correct, y_high_correct],
                 mode='lines',
                 name="Интерполационна линия",
                 line=dict(color='red', width=2, dash='dot')
@@ -231,7 +236,6 @@ else:
                 name="Твоята точка",
                 marker=dict(size=8, color='red', symbol='circle')
             ))
-
             fig.update_layout(
                 title="Интерактивна диаграма на изолинии (Ee / Ei)",
                 xaxis_title="h / D",
